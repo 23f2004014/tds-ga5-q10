@@ -42,26 +42,10 @@ Base.metadata.create_all(
 app = FastAPI()
 
 
-import os
-
-BASE_URL = os.getenv(
-    "BASE_URL",
-    "http://127.0.0.1:8000/a2a"
-)
+BASE_URL = "https://tds-ga5-q10-5pqn.onrender.com/a2a"
 
 
 lock = threading.Lock()
-
-
-SUPPORTED_INPUT = (
-    "application/vnd.ga5.invoice-claim-batch+json"
-)
-
-
-SUPPORTED_RESULT = (
-    "application/vnd.ga5.invoice-action-results+json"
-)
-
 
 
 def check_headers(
@@ -70,20 +54,16 @@ def check_headers(
 ):
 
     if a2a_version != "1.0":
-
         raise HTTPException(
-            400,
-            "Invalid A2A Version"
+            status_code=400,
+            detail="Invalid A2A Version"
         )
-
 
     if content_type != "application/a2a+json":
-
         raise HTTPException(
-            415,
-            "Invalid media type"
+            status_code=415,
+            detail="Invalid media type"
         )
-
 
 
 @app.get(
@@ -95,35 +75,13 @@ def card():
         BASE_URL
     )
 
-@app.post(
-    "/a2a/message:send",
-    dependencies=[
-        Depends(check_headers)
-    ]
-)
-def message_send(
-    body: dict,
-    user=Depends(authenticate),
-    db: Session = Depends(get_db)
-):
-    return message(
-        body=body,
-        user=user,
-        db=db
-    )
 
-@app.post(
-    "/a2a/message",
-    dependencies=[
-        Depends(check_headers)
-    ]
-)
-def message(
-    body: dict,
-    user=Depends(authenticate),
-    db: Session = Depends(get_db)
-):
 
+def process_message(
+    body: dict,
+    user,
+    db: Session
+):
 
     msg = body["message"]
 
@@ -143,8 +101,7 @@ def message(
         )
 
         return {
-            "task":
-            build_task(task)
+            "task": build_task(task)
         }
 
 
@@ -181,9 +138,54 @@ def message(
 
 
     return {
-        "task":
-        build_task(task)
+        "task": build_task(task)
     }
+
+
+
+
+
+@app.post(
+    "/a2a/message",
+    dependencies=[
+        Depends(check_headers)
+    ]
+)
+def message(
+    body: dict,
+    user=Depends(authenticate),
+    db: Session = Depends(get_db)
+):
+
+    return process_message(
+        body,
+        user,
+        db
+    )
+
+
+
+
+
+@app.post(
+    "/a2a/message:send",
+    dependencies=[
+        Depends(check_headers)
+    ]
+)
+def message_send(
+    body: dict,
+    user=Depends(authenticate),
+    db: Session = Depends(get_db)
+):
+
+    return process_message(
+        body,
+        user,
+        db
+    )
+
+
 
 
 
@@ -210,61 +212,36 @@ def continue_task(
     if not task or task.principal != user:
 
         raise HTTPException(
-            403,
-            "Forbidden"
+            status_code=403,
+            detail="Forbidden"
         )
-
 
 
     with lock:
 
-
         if task.state == "TASK_STATE_COMPLETED":
 
             return {
-                "task":
-                build_task(task)
+                "task": build_task(task)
             }
 
 
 
-        result_data = (
-            body["message"]
-            ["parts"][0]
-            ["data"]
-        )
-
+        data = body["message"]["parts"][0]["data"]
 
 
         receipt = execute_results(
             task,
-            result_data
+            data
         )
 
 
-
-        old_artifact = json.loads(
-            task.artifacts
-        )
-
+        task.state = "TASK_STATE_COMPLETED"
 
 
         task.artifacts = json.dumps(
-            {
-                "proposalArtifact":
-                    old_artifact,
-
-                "receiptArtifact":
-                    receipt
-            }
+            receipt
         )
-
-
-
-        task.state = (
-            "TASK_STATE_COMPLETED"
-        )
-
 
 
         db.commit()
@@ -272,10 +249,8 @@ def continue_task(
 
 
     return {
-        "task":
-        build_task(task)
+        "task": build_task(task)
     }
-
 
 
 
@@ -287,11 +262,11 @@ def continue_task(
 def get_task(
     task_id: str,
     user=Depends(authenticate),
-    db: Session=Depends(get_db)
+    db: Session = Depends(get_db)
 ):
 
 
-    task=db.get(
+    task = db.get(
         Task,
         task_id
     )
@@ -300,14 +275,13 @@ def get_task(
     if not task or task.principal != user:
 
         raise HTTPException(
-            404,
-            "Not found"
+            status_code=404,
+            detail="Not found"
         )
 
 
     return {
-        "task":
-        build_task(task)
+        "task": build_task(task)
     }
 
 
@@ -319,27 +293,25 @@ def get_task(
 )
 def tasks(
     user=Depends(authenticate),
-    db:Session=Depends(get_db)
+    db: Session = Depends(get_db)
 ):
 
 
-    result = db.query(
-        Task
-    ).filter(
-        Task.principal == user
-    ).all()
+    result = (
+        db.query(Task)
+        .filter(
+            Task.principal == user
+        )
+        .all()
+    )
 
 
     return {
-
-        "tasks":
-        [
+        "tasks":[
             build_task(t)
             for t in result
         ]
-
     }
-
 
 
 
@@ -347,136 +319,38 @@ def tasks(
 
 def build_task(task):
 
+    return {
 
-    stored = json.loads(
-        task.artifacts
-    )
+        "id": task.id,
 
+        "contextId": task.context_id,
 
-
-    if task.state == "TASK_STATE_COMPLETED":
-
-
-        receipt = stored["receiptArtifact"]
+        "status":{
+            "state": task.state
+        },
 
 
-        return {
+        "history":
+            json.loads(task.history),
 
 
-            "id":
-            task.id,
+        "artifacts":[
 
-
-            "contextId":
-            task.context_id,
-
-
-            "status":
             {
-                "state":
-                task.state
-            },
+                "parts":[
 
-
-            "history":
-            json.loads(
-                task.history
-            ),
-
-
-
-            "artifacts":
-            [
-
-                {
-
-                "parts":
-
-                    [
-
-                        {
-
+                    {
                         "mediaType":
                         "application/vnd.ga5.invoice-action-proposals+json",
 
                         "data":
-                        stored["proposalArtifact"]
+                        json.loads(task.artifacts)
 
-                        },
+                    }
 
+                ]
+            }
 
-                        {
+        ]
 
-                        "mediaType":
-                        "application/vnd.ga5.invoice-action-receipts+json",
-
-                        "data":
-                        receipt
-
-                        }
-
-                    ]
-
-                }
-
-            ]
-
-        }
-
-
-
-    else:
-
-
-        return {
-
-
-            "id":
-            task.id,
-
-
-            "contextId":
-            task.context_id,
-
-
-            "status":
-            {
-                "state":
-                task.state
-            },
-
-
-            "history":
-            json.loads(
-                task.history
-            ),
-
-
-
-            "artifacts":
-
-            [
-
-                {
-
-                "parts":
-
-                    [
-
-                        {
-
-                        "mediaType":
-                        "application/vnd.ga5.invoice-action-proposals+json",
-
-                        "data":
-                        stored
-
-                        }
-
-                    ]
-
-                }
-
-            ]
-
-        }
+    }
