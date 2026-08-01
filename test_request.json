@@ -1,0 +1,32 @@
+{
+    "message": {
+      "messageId": "msg001",
+      "role": "ROLE_USER",
+      "parts": [
+        {
+          "mediaType": "application/vnd.ga5.invoice-claim-batch+json",
+          "data": {
+            "batchId": "batch001",
+            "policyRevision": "v1",
+            "packages": [
+              {
+                "packageId": "pkg001",
+                "vendorName": "ABC Pvt Ltd",
+                "invoiceNumber": "INV100",
+                "amountMinor": 50000,
+                "currency": "INR",
+                "evidenceRefs": [
+                  "[invoice amount]",
+                  "[vendor verified]",
+                  "[payment record]"
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "configuration": {
+      "returnImmediately": false
+    }
+  }

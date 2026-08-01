@@ -1,0 +1,25 @@
+{
+    "message": {
+      "messageId": "result002",
+      "taskId": "d9a6de36-28ec-4aa3-849c-bca2b21f82ae",
+      "contextId": "9b8f9b6a-d079-45c9-8bcd-1ab0198586c1",
+      "role": "ROLE_USER",
+      "parts": [
+        {
+          "mediaType": "application/vnd.ga5.invoice-action-results+json",
+          "data": {
+            "batchId": "batch001",
+            "results": [
+              {
+                "packageId": "pkg001",
+                "actionId": "act_06473e7b-733a-42",
+                "action": "settle_invoice",
+                "outcome": "ACCEPTED",
+                "receiptNonce": "receipt-test-001"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
