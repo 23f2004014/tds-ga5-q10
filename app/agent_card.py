@@ -2,83 +2,69 @@ def create_card(base_url):
 
     return {
 
-
-        "name":
-        "Invoice Action Agent",
-
+        "name": "Invoice Action Agent",
 
         "description":
         "AI agent that reconciles invoice packages",
 
-
-        "version":
-        "1.0",
+        "version": "1.0",
 
 
+        "capabilities": {
 
-        "capabilities":{
+            "streaming": False,
 
-            "streaming":False,
-
-            "pushNotifications":False
+            "pushNotifications": False
 
         },
 
 
-        "skills":[
+        "skills": [
 
             {
 
-            "name":
-            "invoice_action_agent",
+                "name":
+                "invoice_action_agent",
 
+                "description":
+                "Invoice decision and evidence extraction agent",
 
-            "description":
-            "Invoice decision and evidence extraction agent",
-
-
-            "tags":[
-                "invoice",
-                "audit",
-                "finance"
-            ]
+                "tags": [
+                    "invoice",
+                    "audit",
+                    "finance"
+                ]
 
             }
 
         ],
 
 
-
-        "supportedInterfaces":[
+        "supportedInterfaces": [
 
             {
 
-            "url":
-            base_url,
+                "url": base_url,
 
+                "protocolBinding":
+                "HTTP+JSON",
 
-            "protocolBinding":
-            "HTTP+JSON",
-
-
-            "protocolVersion":
-            "1.0"
+                "protocolVersion":
+                "1.0"
 
             }
 
         ],
 
 
-
-        "defaultInputModes":[
+        "defaultInputModes": [
 
             "application/vnd.ga5.invoice-claim-batch+json"
 
         ],
 
 
-
-        "defaultOutputModes":[
+        "defaultOutputModes": [
 
             "application/vnd.ga5.invoice-action-proposals+json",
 
