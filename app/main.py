@@ -95,7 +95,22 @@ def card():
         BASE_URL
     )
 
-
+@app.post(
+    "/a2a/message:send",
+    dependencies=[
+        Depends(check_headers)
+    ]
+)
+def message_send(
+    body: dict,
+    user=Depends(authenticate),
+    db: Session = Depends(get_db)
+):
+    return message(
+        body=body,
+        user=user,
+        db=db
+    )
 
 @app.post(
     "/a2a/message",
@@ -169,8 +184,6 @@ def message(
         "task":
         build_task(task)
     }
-
-
 
 
 
