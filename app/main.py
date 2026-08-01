@@ -1,5 +1,6 @@
 import json
 import threading
+import os
 
 from fastapi import (
     FastAPI,
@@ -8,7 +9,9 @@ from fastapi import (
     HTTPException
 )
 
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
+
 
 from .database import (
     Base,
@@ -42,10 +45,22 @@ Base.metadata.create_all(
 app = FastAPI()
 
 
-BASE_URL = "https://tds-ga5-q10-5pqn.onrender.com/a2a"
+BASE_URL = os.getenv(
+    "BASE_URL",
+    "http://127.0.0.1:8000/a2a"
+)
 
 
 lock = threading.Lock()
+
+
+def a2a_response(data):
+
+    return JSONResponse(
+        content=data,
+        media_type="application/a2a+json"
+    )
+
 
 
 def check_headers(
@@ -54,16 +69,20 @@ def check_headers(
 ):
 
     if a2a_version != "1.0":
+
         raise HTTPException(
             status_code=400,
             detail="Invalid A2A Version"
         )
 
+
     if content_type != "application/a2a+json":
+
         raise HTTPException(
             status_code=415,
             detail="Invalid media type"
         )
+
 
 
 @app.get(
@@ -71,16 +90,24 @@ def check_headers(
 )
 def card():
 
-    return create_card(
-        BASE_URL
+    return JSONResponse(
+        content=create_card(BASE_URL),
+        media_type="application/json"
     )
 
 
 
-def process_message(
+@app.post(
+    "/a2a/message",
+    dependencies=[
+        Depends(check_headers)
+    ]
+)
+def message(
     body: dict,
-    user,
-    db: Session
+    user=Depends(authenticate),
+    db: Session = Depends(get_db)
+
 ):
 
     msg = body["message"]
@@ -100,10 +127,9 @@ def process_message(
             old
         )
 
-        return {
+        return a2a_response({
             "task": build_task(task)
-        }
-
+        })
 
 
     data = msg["parts"][0]["data"]
@@ -119,14 +145,12 @@ def process_message(
         )
 
 
-
     task = create_task(
         db,
         user,
         data,
         proposals
     )
-
 
 
     save_request(
@@ -137,55 +161,9 @@ def process_message(
     )
 
 
-    return {
+    return a2a_response({
         "task": build_task(task)
-    }
-
-
-
-
-
-@app.post(
-    "/a2a/message",
-    dependencies=[
-        Depends(check_headers)
-    ]
-)
-def message(
-    body: dict,
-    user=Depends(authenticate),
-    db: Session = Depends(get_db)
-):
-
-    return process_message(
-        body,
-        user,
-        db
-    )
-
-
-
-
-
-@app.post(
-    "/a2a/message:send",
-    dependencies=[
-        Depends(check_headers)
-    ]
-)
-def message_send(
-    body: dict,
-    user=Depends(authenticate),
-    db: Session = Depends(get_db)
-):
-
-    return process_message(
-        body,
-        user,
-        db
-    )
-
-
+    })
 
 
 
@@ -200,8 +178,8 @@ def continue_task(
     body: dict,
     user=Depends(authenticate),
     db: Session = Depends(get_db)
-):
 
+):
 
     task = db.get(
         Task,
@@ -217,14 +195,15 @@ def continue_task(
         )
 
 
+
     with lock:
+
 
         if task.state == "TASK_STATE_COMPLETED":
 
-            return {
+            return a2a_response({
                 "task": build_task(task)
-            }
-
+            })
 
 
         data = body["message"]["parts"][0]["data"]
@@ -248,11 +227,9 @@ def continue_task(
 
 
 
-    return {
+    return a2a_response({
         "task": build_task(task)
-    }
-
-
+    })
 
 
 
@@ -263,8 +240,8 @@ def get_task(
     task_id: str,
     user=Depends(authenticate),
     db: Session = Depends(get_db)
-):
 
+):
 
     task = db.get(
         Task,
@@ -280,11 +257,9 @@ def get_task(
         )
 
 
-    return {
+    return a2a_response({
         "task": build_task(task)
-    }
-
-
+    })
 
 
 
@@ -296,24 +271,21 @@ def tasks(
     db: Session = Depends(get_db)
 ):
 
-
-    result = (
-        db.query(Task)
-        .filter(
-            Task.principal == user
-        )
-        .all()
-    )
+    result = db.query(
+        Task
+    ).filter(
+        Task.principal == user
+    ).all()
 
 
-    return {
-        "tasks":[
+    return a2a_response({
+
+        "tasks": [
             build_task(t)
             for t in result
         ]
-    }
 
-
+    })
 
 
 
@@ -325,30 +297,40 @@ def build_task(task):
 
         "contextId": task.context_id,
 
-        "status":{
+
+        "status": {
+
             "state": task.state
+
         },
 
 
-        "history":
-            json.loads(task.history),
+        "history": json.loads(
+            task.history
+        ),
 
 
-        "artifacts":[
+        "artifacts": [
 
             {
-                "parts":[
+
+                "parts": [
 
                     {
+
                         "mediaType":
                         "application/vnd.ga5.invoice-action-proposals+json",
 
+
                         "data":
-                        json.loads(task.artifacts)
+                        json.loads(
+                            task.artifacts
+                        )
 
                     }
 
                 ]
+
             }
 
         ]
